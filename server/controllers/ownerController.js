@@ -1,20 +1,41 @@
 const Property = require("../models/PropertySchema");
+const Booking = require("../models/BookingSchema");
+const fs = require("fs");
+const path = require("path");
 
 // Add Property
 exports.addProperty = async (req, res) => {
   try {
+    const propertyData = { ...req.body };
+    
+    // Parse numeric fields if they are sent as strings from FormData
+    if (propertyData.price) propertyData.price = Number(propertyData.price);
+    if (propertyData.bedrooms) propertyData.bedrooms = Number(propertyData.bedrooms);
+    if (propertyData.bathrooms) propertyData.bathrooms = Number(propertyData.bathrooms);
+
+    if (req.file) {
+      propertyData.image = `/uploads/${req.file.filename}`;
+    }
+
     const property = await Property.create({
-      ...req.body,
+      ...propertyData,
       owner: req.user.id,
     });
 
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
       message: "Property Added Successfully",
       property,
     });
   } catch (error) {
-    res.status(500).json({
+    // Delete uploaded image if creation failed
+    if (req.file) {
+      fs.unlink(req.file.path, (err) => {
+        if (err) console.error("Failed to delete temp file:", err);
+      });
+    }
+
+    return res.status(500).json({
       success: false,
       message: error.message,
     });
@@ -40,20 +61,45 @@ exports.updateProperty = async (req, res) => {
       });
     }
 
+    const propertyData = { ...req.body };
+
+    // Parse numeric fields if they are sent as strings from FormData
+    if (propertyData.price) propertyData.price = Number(propertyData.price);
+    if (propertyData.bedrooms) propertyData.bedrooms = Number(propertyData.bedrooms);
+    if (propertyData.bathrooms) propertyData.bathrooms = Number(propertyData.bathrooms);
+
+    if (req.file) {
+      propertyData.image = `/uploads/${req.file.filename}`;
+
+      // Clean up previous image file if it exists
+      if (property.image && property.image.startsWith("/uploads/")) {
+        const oldPath = path.join(__dirname, "..", property.image);
+        fs.unlink(oldPath, (err) => {
+          if (err) console.error("Failed to delete old property image:", err.message);
+        });
+      }
+    }
+
     const updatedProperty = await Property.findByIdAndUpdate(
       req.params.id,
-      req.body,
+      propertyData,
       { new: true }
     );
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       message: "Property Updated Successfully",
       property: updatedProperty,
     });
-
   } catch (error) {
-    res.status(500).json({
+    // Delete uploaded image if update failed
+    if (req.file) {
+      fs.unlink(req.file.path, (err) => {
+        if (err) console.error("Failed to delete temp file:", err);
+      });
+    }
+
+    return res.status(500).json({
       success: false,
       message: error.message,
     });
@@ -79,15 +125,26 @@ exports.deleteProperty = async (req, res) => {
       });
     }
 
+    // Clean up image file in uploads/
+    if (property.image && property.image.startsWith("/uploads/")) {
+      const imgPath = path.join(__dirname, "..", property.image);
+      fs.unlink(imgPath, (err) => {
+        if (err) console.error("Failed to delete property image file:", err.message);
+      });
+    }
+
+    // Cascade delete bookings associated with this property
+    await Booking.deleteMany({ property: req.params.id });
+
+    // Delete property itself
     await Property.findByIdAndDelete(req.params.id);
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
-      message: "Property Deleted Successfully",
+      message: "Property and associated bookings deleted successfully",
     });
-
   } catch (error) {
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: error.message,
     });
@@ -99,13 +156,13 @@ exports.myProperties = async (req, res) => {
   try {
     const properties = await Property.find({ owner: req.user.id });
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       count: properties.length,
       properties,
     });
   } catch (error) {
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: error.message,
     });

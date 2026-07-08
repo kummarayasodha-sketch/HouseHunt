@@ -7,6 +7,7 @@ const {
   getAllBookings,
   deleteUser,
   deleteProperty,
+  deleteBooking,
 } = require("../controllers/adminController");
 
 const {
@@ -23,5 +24,7 @@ router.get("/bookings", verifyToken, verifyAdmin, getAllBookings);
 router.delete("/user/:id", verifyToken, verifyAdmin, deleteUser);
 
 router.delete("/property/:id", verifyToken, verifyAdmin, deleteProperty);
+
+router.delete("/booking/:id", verifyToken, verifyAdmin, deleteBooking);
 
 module.exports = router;
