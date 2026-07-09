@@ -2,7 +2,7 @@ const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
 
-const connectDB = require("./config/db");
+const connectDB = require("./config/connect");
 const ownerRoutes = require("./routes/ownerRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 
@@ -14,6 +14,8 @@ connectDB();
 
 app.use(cors());
 app.use(express.json());
+const path = require("path");
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 app.use("/api/user", userRoutes);
 app.use("/api/owner", ownerRoutes);
